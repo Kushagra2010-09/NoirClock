@@ -1,0 +1,46 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      # If you uploaded NoirClock.zip (single file) it is unpacked here;
+      # otherwise the repo root is treated as the project.
+      - name: Locate project
+        run: |
+          if [ -f NoirClock.zip ]; then
+            rm -rf _src && unzip -q NoirClock.zip -d _src
+            echo "PROJECT_DIR=_src/NoirClock" >> "$GITHUB_ENV"
+          else
+            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+          fi
+
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: clock-v${{ github.run_number }}
+          name: Noir Clock build ${{ github.run_number }}
+          files: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
